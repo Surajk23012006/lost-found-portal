@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>School Lost & Found</title>
+  <style>
+    /* Basic Reset & Styling */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background: #f9fafb;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #2563eb;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    main {
+      flex-grow: 1;
+      padding: 1rem 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    button:disabled {
+      background: #a5b4fc;
+      cursor: not-allowed;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    label {
+      font-weight: bold;
+    }
+    .hidden {
+      display: none;
+    }
+    .card {
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .card img {
+      max-width: 100%;
+      border-radius: 4px;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .flex-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .flex-row > * {
+      flex: 1 1 300px;
+    }
+    .text-center {
+      text-align: center;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+    .nav-buttons button {
+      margin-left: 0.5rem;
+    }
+    .small-text {
+      font-size: 0.9rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>School Lost & Found</h1>
+  <div id="header-controls"></div>
+</header>
+
+<main>
+  <!-- Login View -->
+  <section id="login-view">
+    <h2>Teacher Login</h2>
+    <div id="login-error" class="error hidden"></div>
+    <label for="login-username">Username</label>
+    <input type="text" id="login-username" placeholder="Enter username" autocomplete="username" />
+    <label for="login-password">Password</label>
+    <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password" />
+    <button id="login-btn">Login</button>
+    <p class="small-text">Or <button id="student-view-btn" style="background:none; color:#2563eb; border:none; cursor:pointer; padding:0;">continue as Student</button></p>
+  </section>
+
+  <!-- Admin View -->
+  <section id="admin-view" class="hidden">
+    <h2>Add New Lost Item</h2>
+    <div id="add-item-error" class="error hidden"></div>
+    <label for="item-description">Item Description *</label>
+    <textarea id="item-description" rows="2" placeholder="e.g., Blue water bottle with stickers"></textarea>
+
+    <label for="item-found-location">Where Found *</label>
+    <input type="text" id="item-found-location" placeholder="e.g., Classroom 101, Cafeteria" />
+
+    <label for="item-collection-location">Collection Location *</label>
+    <input type="text" id="item-collection-location" placeholder="e.g., Front Office, Lost & Found Box" />
+
+    <label for="item-image">Item Photo (optional)</label>
+    <input type="file" id="item-image" accept="image/*" />
+    <img id="image-preview" alt="Image preview" class="hidden" />
+
+    <button id="add-item-btn">Add Item</button>
+
+    <h2>Current Lost Items</h2>
+    <div id="current-items"></div>
+
+    <h2>Collected Items History</h2>
+    <div id="collected-items"></div>
+  </section>
+
+  <!-- Student View -->
+  <section id="student-view" class="hidden">
+    <h2>Lost & Found - Student View</h2>
+
+    <h3>Current Lost Items</h3>
+    <div id="student-current-items"></div>
+
+    <h3>Recently Collected Items</h3>
+    <div id="student-collected-items"></div>
+
+    <div class="text-center" style="margin-top: 1rem;">
+      <button id="back-to-login-btn">Back to Login</button>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Sample teachers (username/password)
+  const teachers = [
+    { id: '1', username: 'teacher1', password: 'password123' },
+    { id: '2', username: 'teacher2', password: 'password456' }
+  ];
+
+  // State
+  let currentUser  = null;
+  let lostItems = [];
+
+  // DOM Elements
+  const loginView = document.getElementById('login-view');
+  const adminView = document.getElementById('admin-view');
+  const studentView = document.getElementById('student-view');
+  const headerControls = document.getElementById('header-controls');
+
+  const loginUsernameInput = document.getElementById('login-username');
+  const loginPasswordInput = document.getElementById('login-password');
+  const loginBtn = document.getElementById('login-btn');
+  const loginError = document.getElementById('login-error');
+  const studentViewBtn = document.getElementById('student-view-btn');
+
+  const addItemBtn = document.getElementById('add-item-btn');
+  const addItemError = document.getElementById('add-item-error');
+  const itemDescriptionInput = document.getElementById('item-description');
+  const itemFoundLocationInput = document.getElementById('item-found-location');
+  const itemCollectionLocationInput = document.getElementById('item-collection-location');
+  const itemImageInput = document.getElementById('item-image');
+  const imagePreview = document.getElementById('image-preview');
+
+  const currentItemsDiv = document.getElementById('current-items');
+  const collectedItemsDiv = document.getElementById('collected-items');
+
+  const studentCurrentItemsDiv = document.getElementById('student-current-items');
+  const studentCollectedItemsDiv = document.getElementById('student-collected-items');
+  const backToLoginBtn = document.getElementById('back-to-login-btn');
+
+  // Load lost items from localStorage
+  function loadLostItems() {
+    const stored = localStorage.getItem('lostItems');
+    lostItems = stored ? JSON.parse(stored) : [];
+  }
+
+  // Save lost items to localStorage
+  function saveLostItems() {
+    localStorage.setItem('lostItems', JSON.stringify(lostItems));
+  }
+
+  // Show/hide views
+  function showView(view) {
+    loginView.classList.add('hidden');
+    adminView.classList.add('hidden');
+    studentView.classList.add('hidden');
+    headerControls.innerHTML = '';
+
+    if (view === 'login') {
+      loginView.classList.remove('hidden');
+      currentUser  = null;
+      updateHeader();
+    } else if (view === 'admin') {
+      adminView.classList.remove('hidden');
+      updateHeader();
+      renderAdminItems();
+    } else if (view === 'student') {
+      studentView.classList.remove('hidden');
+      updateHeader();
+      renderStudentItems();
+    }
+  }
+
+  // Update header controls based on login state
+  function updateHeader() {
+    headerControls.innerHTML = '';
+    if (currentUser ) {
+      const welcomeSpan = document.createElement('span');
+      welcomeSpan.textContent = `Welcome, ${currentUser .username}`;
+
+      const studentBtn = document.createElement('button');
+      studentBtn.textContent = 'Student View';
+      studentBtn.style.marginLeft = '1rem';
+      studentBtn.onclick = () => showView('student');
+
+      const adminBtn = document.createElement('button');
+      adminBtn.textContent = 'Admin View';
+      adminBtn.style.marginLeft = '1rem';
+      adminBtn.onclick = () => showView('admin');
+
+      const logoutBtn = document.createElement('button');
+      logoutBtn.textContent = 'Logout';
+      logoutBtn.style.marginLeft = '1rem';
+      logoutBtn.onclick = () => {
+        currentUser  = null;
+        showView('login');
+      };
+
+      headerControls.appendChild(welcomeSpan);
+      headerControls.appendChild(studentBtn);
+      headerControls.appendChild(adminBtn);
+      headerControls.appendChild(logoutBtn);
+    }
+  }
+
+  // Login handler
+  loginBtn.addEventListener('click', () => {
+    const username = loginUsernameInput.value.trim();
+    const password = loginPasswordInput.value.trim();
+    loginError.classList.add('hidden');
+    if (!username || !password) {
+      loginError.textContent = 'Please enter username and password.';
+      loginError.classList.remove('hidden');
+      return;
+    }
+    const teacher = teachers.find(t => t.username === username && t.password === password);
+    if (teacher) {
+      currentUser  = teacher;
+      loginUsernameInput.value = '';
+      loginPasswordInput.value = '';
+      showView('admin');
+    } else {
+      loginError.textContent = 'Invalid username or password.';
+      loginError.classList.remove('hidden');
+    }
+  });
+
+  // Continue as student button
+  studentViewBtn.addEventListener('click', () => {
+    showView('student');
+  });
+
+  // Back to login button (from student view)
+  backToLoginBtn.addEventListener('click', () => {
+    showView('login');
+  });
+
+  // Image preview handler
+  itemImageInput.addEventListener('change', () => {
+    const file = itemImageInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        imagePreview.src = reader.result;
+        imagePreview.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    } else {
+      imagePreview.src = '';
+      imagePreview.classList.add('hidden');
+    }
+  });
+
+  // Add new lost item
+  addItemBtn.addEventListener('click', () => {
+    addItemError.classList.add('hidden');
+    const description = itemDescriptionInput.value.trim();
+    const foundLocation = itemFoundLocationInput.value.trim();
+    const collectionLocation = itemCollectionLocationInput.value.trim();
+    const imageData = imagePreview.src || '';
+
+    if (!description || !foundLocation || !collectionLocation) {
+      addItemError.textContent = 'Please fill in all required fields.';
+      addItemError.classList.remove('hidden');
+      return;
+    }
+
+    const newItem = {
+      id: Date.now().toString(),
+      description,
+      foundLocation,
+      collectionLocation,
+      image: imageData,
+      collected: false,
+      collectedBy: null,
+      collectedDate: null,
+      collectedNotes: null,
+      createdAt: new Date().toISOString()
+    };
+
+    lostItems.push(newItem);
+    saveLostItems();
+
+    // Clear form
+    itemDescriptionInput.value = '';
+    itemFoundLocationInput.value = '';
+    itemCollectionLocationInput.value = '';
+    itemImageInput.value = '';
+    imagePreview.src = '';
+    imagePreview.classList.add('hidden');
+
+    renderAdminItems();
+  });
+
+  // Render admin lost items (current and collected)
+  function renderAdminItems() {
+    // Current items
+    currentItemsDiv.innerHTML = '';
+    const currentItems = lostItems.filter(item => !item.collected);
+    if (currentItems.length === 0) {
+      currentItemsDiv.textContent = 'No current lost items.';
+    } else {
+      currentItems.forEach(item => {
+        const card = createItemCard(item, true);
+        currentItemsDiv.appendChild(card);
+      });
+    }
+
+    // Collected items
+    collectedItemsDiv.innerHTML = '';
+    const collectedItems = lostItems.filter(item => item.collected);
+    if (collectedItems.length === 0) {
+      collectedItemsDiv.textContent = 'No collected items yet.';
+    } else {
+      collectedItems.forEach(item => {
+        const card = createItemCard(item, false);
+        collectedItemsDiv.appendChild(card);
+      });
+    }
+  }
+
+  // Render student view items
+  function renderStudentItems() {
+    // Current items
+    studentCurrentItemsDiv.innerHTML = '';
+    const currentItems = lostItems.filter(item => !item.collected);
+    if (currentItems.length === 0) {
+      studentCurrentItemsDiv.textContent = 'No lost items currently.';
+    } else {
+      currentItems.forEach(item => {
+        const card = createItemCard(item, false, false);
+        studentCurrentItemsDiv.appendChild(card);
+      });
+    }
+
+    // Collected items (show last 6)
+    studentCollectedItemsDiv.innerHTML = '';
+    const collectedItems = lostItems.filter(item => item.collected).slice(-6).reverse();
+    if (collectedItems.length === 0) {
+      studentCollectedItemsDiv.textContent = 'No recently collected items.';
+    } else {
+      collectedItems.forEach(item => {
+        const card = createItemCard(item, false, false, true);
+        studentCollectedItemsDiv.appendChild(card);
+      });
+    }
+  }
+
+  // Create item card element
+  // adminControls: boolean - show collection form if true
+  // showCollectButton: boolean - show collect button (default true)
+  // isStudentView: boolean - if true, no collect button or form
+  // isCollectedHistory: boolean - if true, show collected info
+  function createItemCard(item, adminControls = false, showCollectButton = true, isCollectedHistory = false) {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const title = document.createElement('h3');
+    title.textContent = item.description;
+    card.appendChild(title);
+
+    const foundLoc = document.createElement('p');
+    foundLoc.innerHTML = `<strong>Found in:</strong> ${item.foundLocation}`;
+    card.appendChild(foundLoc);
+
+    if (item.image) {
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = `Photo of ${item.description}`;
+      card.appendChild(img);
+    }
+
+    if (!isCollectedHistory) {
+      const collectLoc = document.createElement('p');
+      collectLoc.innerHTML = `<strong>Collect at:</strong> ${item.collectionLocation}`;
+      card.appendChild(collectLoc);
+
+      const foundDate = document.createElement('p');
+      foundDate.innerHTML = `<strong>Found on:</strong> ${new Date(item.createdAt).toLocaleDateString()}`;
+      card.appendChild(foundDate);
+    }
+
+    if (isCollectedHistory) {
+      const collectedBy = document.createElement('p');
+      collectedBy.innerHTML = `<strong>Collected by:</strong> ${item.collectedBy || 'Unknown'}`;
+      card.appendChild(collectedBy);
+
+      const collectedDate = document.createElement('p');
+      collectedDate.innerHTML = `<strong>Collected on:</strong> ${item.collectedDate ? new Date(item.collectedDate).toLocaleDateString() : 'Unknown'}`;
+      card.appendChild(collectedDate);
+
+      if (item.collectedNotes) {
+        const notes = document.createElement('p');
+        notes.innerHTML = `<strong>Notes:</strong> ${item.collectedNotes}`;
+        card.appendChild(notes);
+      }
+    }
+
+    if (adminControls && !item.collected) {
+      // Add collection form
+      const form = document.createElement('div');
+      form.style.marginTop = '1rem';
+
+      const collectedByInput = document.createElement('input');
+      collectedByInput.type = 'text';
+      collectedByInput.placeholder = 'Collected by (student name)';
+      collectedByInput.style.marginBottom = '0.5rem';
+      collectedByInput.style.width = '100%';
+
+      const notesInput = document.createElement('textarea');
+      notesInput.placeholder = 'Verification notes (optional)';
+      notesInput.rows = 2;
+      notesInput.style.width = '100%';
+      notesInput.style.marginBottom = '0.5rem';
+
+      const collectBtn = document.createElement('button');
+      collectBtn.textContent = 'Mark as Collected';
+      collectBtn.style.width = '100%';
+
+      collectBtn.onclick = () => {
+        const collector = collectedByInput.value.trim();
+        if (!collector) {
+          alert('Please enter who collected the item.');
+          return;
+        }
+        markItemCollected(item.id, collector, notesInput.value.trim());
+      };
+
+      form.appendChild(collectedByInput);
+      form.appendChild(notesInput);
+      form.appendChild(collectBtn);
+
+      card.appendChild(form);
+    }
+
+    return card;
+  }
+
+  // Mark item as collected
+  function markItemCollected(itemId, collectedBy, notes) {
+    const item = lostItems.find(i => i.id === itemId);
+    if (!item) return;
+    item.collected = true;
+    item.collectedBy = collectedBy;
+    item.collectedNotes = notes;
+    item.collectedDate = new Date().toISOString();
+    saveLostItems();
+    renderAdminItems();
+  }
+
+  // Initialize app
+  function init() {
+    loadLostItems();
+    showView('login');
+  }
+
+  init();
+</script>
+
+</body>
+</html>
